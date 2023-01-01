@@ -20,21 +20,38 @@ void draughts()
     board = populateBoardDraughts(board);
     displayBoard(board);
 
-    player player1 = new player(false, 12);
-    player player2 = new player(true, 12);
+    player player1 = new player(false, 12, "Player 1");
+    player player2 = new player(true, 12, "Player 2");
 
     bool gameEnd = false;
     while (gameEnd == false)
     {
-        Turn(board, player1);
+        //player 1 turn
+        Turn(board, player1, player2);
+        if (player2.returnScore() == 0)
+        {
+            player1.giveWin();
+            gameEnd = true;
+        }
+
+        //player 2 turn
+        Turn(board, player2, player1);
+        if (player1.returnScore() == 0)
+        {
+            player2.giveWin();
+            gameEnd = true;
+        }
     }
+
+    winner(player1, player2);
 }
 
-static piece[,] Turn(piece[,] board, player player)
+static piece[,] Turn(piece[,] board, player player, player playerOther)
 {
     bool turnOver = false;
     while (turnOver == false)
     {
+        Console.WriteLine("\n{0}'s turn", player.returnName());
         try
         {
             Console.WriteLine("Which piece would you like to move?");
@@ -49,37 +66,122 @@ static piece[,] Turn(piece[,] board, player player)
             Console.WriteLine("Where would you like to move it?");
             int desiredMove = convertMove(Console.ReadLine());
 
-            
-            int difference = desiredMove - selectedPiece;
+            int[] difference = findDifference(selectedPiece, desiredMove);
 
-            if (checkValid(board, selectedPiece, desiredMove, player, difference) == true)
+            if (checkValid(board, selectedPiece, desiredMove, player, difference, true) == true)
             {
                 try
                 {
-                    
-                    
+                    //Move the piece
+                    board[desiredMove / 10, desiredMove % 10] = board[selectedPiece / 10, selectedPiece % 10];
+                    board[selectedPiece / 10, selectedPiece % 10] = null;
+
+                    //Check if the piece has been upgraded into a king
+                    checkIfUpgrade(board, desiredMove);
+
+                    //check if an enemy piece has been destroyed
+                    int midpoint = findMidpoint(selectedPiece, desiredMove);
+                    if (checkAttackMove(selectedPiece, midpoint) == true)
+                    {
+                        board[midpoint / 10, midpoint % 10] = null;
+                        playerOther.subtractScore(1);
+
+                        if (canContinue(board, player) == false)
+                        {
+                            turnOver = true;
+                        }
+                    }
+                    else
+                    {
+                        turnOver = true;
+                    }
+
+                    displayBoard(board);
+                }
+                catch
+                {
+                    Console.WriteLine("Move failed: Unknown error");
                 }
             }
         }
         catch (Exception e)
         {
             Console.WriteLine("Invalid input");
-            Console.WriteLine(e);
+            //Console.WriteLine(e);
         }
     }
     return board;
 }
 
-static int convertMove(string preMove)
+static void checkIfUpgrade(piece[,] board, int desiredMove)
 {
-    char a = preMove[0];
-    char b = preMove[1];
+    if (desiredMove % 10 == 0)
+    {
+        board[desiredMove / 10, desiredMove % 10].upgrade();
+    }
+}
 
-    int a1 = Convert.ToInt32(a - 97);
-    int b1 = Convert.ToInt32(b - 49);
+static bool canContinue(piece[,] board, player player)
+{
+    for (int y = 0; y < 8; y++)
+    {
+        for (int x = 0; x < 8; x++)
+        {
+            try
+            {
+                if (board[x, y] != null)
+                {
+                    if (board[x, y].returnTeam() == player.returnTeam())
+                    {
+                        int[] difference = new int[2];
 
-    int newMove = (a1 * 10) + b1;
-    return newMove;
+                        difference[0] = 2;
+                        difference[1] = 2;
+                        if ((x + difference[0] >= 0 && x + difference[0] < 8) && (y + difference[1] >= 0 && y + difference[1] < 8))
+                        {
+                            if (checkValid(board, (x * 10) + y, ((x + difference[0]) * 10) + y + difference[1], player, difference, false) == true)
+                            {
+                                return true;
+                            }
+                        }
+
+                        difference[0] = 2;
+                        difference[1] = -2;
+                        if ((x + difference[0] >= 0 && x + difference[0] < 8) && (y + difference[1] >= 0 && y + difference[1] < 8))
+                        {
+                            if (checkValid(board, (x * 10) + y, ((x + difference[0]) * 10) + y + difference[1], player, difference, false) == true)
+                            {
+                                return true;
+                            }
+                        }
+
+                        difference[0] = -2;
+                        difference[1] = 2;
+                        if ((x + difference[0] >= 0 && x + difference[0] < 8) && (y + difference[1] >= 0 && y + difference[1] < 8))
+                        {
+                            if (checkValid(board, (x * 10) + y, ((x + difference[0]) * 10) + y + difference[1], player, difference, false) == true)
+                            {
+                                return true;
+                            }
+                        }
+
+                        difference[0] = -2;
+                        difference[1] = -2;
+                        if ((x + difference[0] >= 0 && x + difference[0] < 8) && (y + difference[1] >= 0 && y + difference[1] < 8))
+                        {
+                            if (checkValid(board, (x * 10) + y, ((x + difference[0]) * 10) + y + difference[1], player, difference, false) == true)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+
+    return false;
 }
 
 static piece[,] populateBoardDraughts(piece[,] board)
@@ -94,12 +196,12 @@ static piece[,] populateBoardDraughts(piece[,] board)
                 if (y <= 2)
                 {
 
-                    piece WhitePiece = new piece(false);
+                    piece WhitePiece = new piece(true);
                     board[x, y] = WhitePiece;
                 }
                 else if (y >= 5)
                 {
-                    piece BlackPiece = new piece(true);
+                    piece BlackPiece = new piece(false);
                     board[x, y] = BlackPiece;
                 }
             }
@@ -111,7 +213,166 @@ static piece[,] populateBoardDraughts(piece[,] board)
     return board;
 }
 
+static int findMidpoint(int selectedPiece, int desiredMove)
+{
+    int[] difference = findDifference(selectedPiece, desiredMove);
+
+    int xSelect = selectedPiece / 10;
+    int ySelect = selectedPiece % 10;
+
+    int xMid = xSelect + (difference[0] / 2);
+    int yMid = ySelect + (difference[1] / 2);
+
+    int midpoint = (xMid * 10) + yMid;
+    return midpoint;
+}
+
+static bool checkAttackMove(int selectedPiece, int midpoint)
+{
+    if (selectedPiece == midpoint)
+    {
+        return false;
+    }
+    return true;
+}
+
+static bool checkDraughtsValid(piece[,] board, int selectedPiece, int midpoint, int[] difference, bool blankMove, player player, piece selected, bool errorMessage)
+{
+    //See if the move is an attack move or not
+    bool attackMove = checkAttackMove(selectedPiece, midpoint);
+
+    if (blankMove == false)
+    {
+        if (errorMessage == true)
+        {
+            Console.WriteLine("Desired space is already occupied");
+        }
+        return false;
+    }
+
+    if (attackMove == false)
+    {
+        
+        //Check that move is a possible option
+        if (difference[0] == 1 || difference[0] == -1)
+        {
+            if (player.returnTeam() == false)
+            {
+                if (difference[1] == -1)
+                {
+                    return true;
+                }
+                if (difference[1] == 1 && selected.isUpgraded() == true)
+                {
+                    return true;
+                }
+            }
+
+            if (player.returnTeam() == true)
+            {
+                if (difference[1] == 1)
+                {
+                    return true;
+                }
+                if (difference[1] == -1 && selected.isUpgraded() == true)
+                {
+                    return true;
+                }
+            }
+            if (errorMessage == true)
+            {
+                Console.WriteLine("Invalid move");
+            }
+            return false;
+        }
+
+        if (errorMessage == true)
+        {
+            Console.WriteLine("Invalid move");
+        }
+        return false;
+    }
+
+    if (attackMove == true)
+    {
+        if (difference[0] == 2 || difference[0] == -2)
+        {
+            if (player.returnTeam() == false)
+            {
+                if (difference[1] == -2)
+                {
+                    if (board[midpoint / 10, midpoint % 10].returnTeam() == true)
+                    {
+                        return true;
+                    }
+                }
+                if (difference[1] == 2 && selected.isUpgraded() == true)
+                {
+                    if (board[midpoint / 10, midpoint % 10].returnTeam() == true)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            if (player.returnTeam() == true)
+            {
+                if (difference[1] == 2)
+                {
+                    if (board[midpoint / 10, midpoint % 10].returnTeam() == false)
+                    {
+                        return true;
+                    }
+                }
+                if (difference[1] == -2 && selected.isUpgraded() == true)
+                {
+                    if (board[midpoint / 10, midpoint % 10].returnTeam() == false)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        if (errorMessage == true)
+        {
+            Console.WriteLine("Invalid move");
+        }
+        return false;
+    }
+    if (errorMessage == true)
+    {
+        Console.WriteLine("Invalid move");
+    }
+    return false;
+}
+
 //Generic functions ---------------------------------------------------------------------------
+
+static int convertMove(string preMove)
+{
+    preMove = preMove.ToLower();
+
+    char a = preMove[0];
+    char b = preMove[1];
+
+    int a1 = Convert.ToInt32(a - 97);
+    int b1 = Convert.ToInt32(b - 49);
+
+    int newMove = (a1 * 10) + b1;
+    return newMove;
+}
+
+static void winner(player player1, player player2)
+{
+    if (player1.checkWin() == true)
+    {
+        Console.WriteLine("Player 1 wins!");
+    }
+    if (player2.checkWin() == true)
+    {
+        Console.WriteLine("Player 2 wins!");
+    }
+}
 
 static piece[,] generateBoard()
 {
@@ -119,49 +380,72 @@ static piece[,] generateBoard()
     return board;
 }
 
-static bool checkValid(piece[,] board ,int selectedPiece, int desiredMove, player player, int difference)
+static bool checkValid(piece[,] board ,int selectedPiece, int desiredMove, player player, int[] difference, bool errorMessage)
 {
     //selected piece
     piece selected = board[selectedPiece / 10, selectedPiece % 10];
 
     //desired move space
+    piece desired = null;
     bool blankMove = false;
     try
     {
-        piece desired = board[desiredMove / 10, desiredMove % 10];
+        if (board[desiredMove / 10, desiredMove % 10] == null)
+        {
+            blankMove = true;
+        }
+        else
+        {
+            desired = board[desiredMove / 10, desiredMove % 10];
+        }
     }
-    catch
+    catch { return false; }
+
+    //Check the piece isn't being moved to the same place it started
+    if (selectedPiece == desiredMove)
     {
-        blankMove = true;
+        if (errorMessage == true)
+        {
+            Console.WriteLine("You cannot move to the space you already occupy");
+        }
+        return false;
     }
 
     //Check slected piece is on players team
-    if (selected.returnTeam == player.returnTeam)
+    if (selected.returnTeam() != player.returnTeam())
     {
-        Console.WriteLine("Selected Piece not on your team");
+        if (errorMessage == true)
+        {
+            Console.WriteLine("Selected Piece not on your team");
+        }
         return false;
     }
     //check piece types
     if (selected.isDraughts() == true)
     {
-        if (blankMove == false)
-        {
-            Console.WriteLine("Desired space is already occupied");
-            return false;
-        }
-
-        int[] possibleMoves = new int[22,]
-        if ()
-        return true;
+        int midpoint = findMidpoint(selectedPiece, desiredMove);
+        return checkDraughtsValid(board, selectedPiece, midpoint, difference, blankMove, player, selected, errorMessage);
     }
 
     return false;
 }
 
+static int[] findDifference(int selectedPiece, int desiredMove)
+{
+    int[] difference = new int[2];
+
+    difference[0] = (desiredMove / 10) - (selectedPiece / 10);
+    difference[1] = (desiredMove % 10) - (selectedPiece % 10);
+
+    return difference;
+}
+
 static void displayBoard(piece[,] board)
 {
+    Console.WriteLine("| |A|B|C|D|E|F|G|H|");
     for (int y = 0; y < 8; y++)
     {
+        Console.Write("|{0}", y + 1);
         for (int x = 0; x < 8; x++)
         {
             Console.Write("|");
@@ -189,10 +473,12 @@ public class player
     public bool Team = false;
     protected int Score = -1;
     protected bool Win = false;
-    public player(bool team, int score)
+    protected string Name = "player";
+    public player(bool team, int score, string name)
     {
         Team = team;
         Score = score;
+        Name = name;
     }
 
     public void subtractScore(int amount)
@@ -219,12 +505,18 @@ public class player
     {
         Win = true;
     }
+
+    public string returnName()
+    {
+        return Name;
+    }
 }
 
 public class piece
 {
     public bool Team = false;
     protected bool Draughts = true;
+    protected bool Upgraded = false;
     public piece(bool team)
     {
         Team = team;
@@ -238,6 +530,16 @@ public class piece
     public bool returnTeam()
     {
         return Team;
+    }
+
+    public void upgrade()
+    {
+        Upgraded = true;
+    }
+
+    public bool isUpgraded()
+    {
+        return Upgraded;
     }
 }
 
@@ -262,4 +564,9 @@ public class chessPiece : piece
     {
         return Type;
     }
+}
+
+public class chessMoves
+{
+    protected int[,] KinghtMoves = new int[8, 2];
 }
