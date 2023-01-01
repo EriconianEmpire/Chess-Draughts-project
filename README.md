@@ -1,1 +1,2 @@
-It's not actually done yet, will be done by christmas
+Draughts should now work fully, chess is not yet implemented
+
