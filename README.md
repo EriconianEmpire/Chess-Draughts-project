@@ -1,2 +1,2 @@
-Draughts should now work fully, chess is not yet implemented
+Draughts should now work fully, chess should also be functional but may have some bugs still.
 
