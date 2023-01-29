@@ -1,6 +1,7 @@
 ﻿
 using System.ComponentModel;
 using System.Security.Cryptography.X509Certificates;
+using System.Transactions;
 
 while (true)
 {
@@ -9,6 +10,10 @@ while (true)
     if (temp == "draughts ")
     {
         draughts();
+    }
+    else if (temp == "chess ")
+    {
+        chess();
     }
 }
 
@@ -27,26 +32,28 @@ void draughts()
     while (gameEnd == false)
     {
         //player 1 turn
-        Turn(board, player1, player2);
+        TurnDraughts(board, player1, player2);
         if (player2.returnScore() == 0)
         {
             player1.giveWin();
             gameEnd = true;
+            break;
         }
 
         //player 2 turn
-        Turn(board, player2, player1);
+        TurnDraughts(board, player2, player1);
         if (player1.returnScore() == 0)
         {
             player2.giveWin();
             gameEnd = true;
+            break;
         }
     }
 
     winner(player1, player2);
 }
 
-static piece[,] Turn(piece[,] board, player player, player playerOther)
+static piece[,] TurnDraughts(piece[,] board, player player, player playerOther)
 {
     bool turnOver = false;
     while (turnOver == false)
@@ -118,6 +125,7 @@ static void checkIfUpgrade(piece[,] board, int desiredMove)
     if (desiredMove % 10 == 0)
     {
         board[desiredMove / 10, desiredMove % 10].upgrade();
+        board[desiredMove / 10, desiredMove % 10].changeSymbol("X");
     }
 }
 
@@ -196,13 +204,13 @@ static piece[,] populateBoardDraughts(piece[,] board)
                 if (y <= 2)
                 {
 
-                    piece WhitePiece = new piece(true);
-                    board[x, y] = WhitePiece;
+                    piece BluePiece = new piece(true, "O");
+                    board[x, y] = BluePiece;
                 }
                 else if (y >= 5)
                 {
-                    piece BlackPiece = new piece(false);
-                    board[x, y] = BlackPiece;
+                    piece RedPiece = new piece(false, "O");
+                    board[x, y] = RedPiece;
                 }
             }
             i++;
@@ -346,6 +354,292 @@ static bool checkDraughtsValid(piece[,] board, int selectedPiece, int midpoint, 
     return false;
 }
 
+//Chess ---------------------------------------------------------------------------------------
+
+void chess()
+{
+    chessPiece[,] board = createBoardChess();
+    
+
+    player player1 = new player(false, -1, "Player 1");
+    player player2 = new player(true, -1, "Player 2");
+
+    bool gameEnd = false;
+    while (gameEnd == false)
+    {
+        //player 1 turn
+        turnChess(board, player1, player2);
+        if (player1.checkWin() == true)
+        {
+            gameEnd = true;
+            break;
+        }
+
+        //player 2 turn
+        turnChess(board, player2, player1);
+        if (player2.checkWin() == true)
+        {
+            gameEnd = true;
+            break;
+        }
+    }
+
+    winner(player1, player2);
+}
+
+static chessPiece[,] turnChess(chessPiece[,] board, player player, player playerOther)
+{
+    displayBoard(board);
+    bool turnOver = false;
+    while (turnOver == false)
+    {
+        Console.WriteLine("\n{0}'s turn", player.returnName());
+        try
+        {
+            Console.WriteLine("Which piece would you like to move?");
+            int selectedPiece = convertMove(Console.ReadLine());
+
+            //check piece is selected
+            if (board[selectedPiece / 10, selectedPiece % 10] == null)
+            {
+                throw new Exception("No piece selected");
+            }
+
+            Console.WriteLine("Where would you like to move it?");
+            int desiredMove = convertMove(Console.ReadLine());
+
+            int[] difference = findDifference(selectedPiece, desiredMove);
+
+            if (checkValid(board, selectedPiece, desiredMove, player, difference, true) == true)
+            {
+                if (checkValidChess(board, selectedPiece, desiredMove, player, difference, true) == true)
+                {
+                    try
+                    {
+                        //Check if the game has been won
+                        if (board[desiredMove / 10, desiredMove % 10] != null)
+                        {
+                            if (board[desiredMove / 10, desiredMove % 10].returnTeam() == playerOther.returnTeam() && board[desiredMove / 10, desiredMove % 10].returnType() == "king")
+                            {
+                                player.giveWin();
+                            }
+                        }
+
+                        //Move the piece
+                        board[desiredMove / 10, desiredMove % 10] = board[selectedPiece / 10, selectedPiece % 10];
+                        board[selectedPiece / 10, selectedPiece % 10] = null;
+
+                        //Will upgrade piece if it can 
+                        upgradeQueen(board, desiredMove, player);
+
+                        turnOver = true;
+                    }
+                    catch
+                    {
+                        Console.WriteLine("Move failed: Unknown error");
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("Invalid input");
+            Console.WriteLine(e);
+        }
+    }
+
+    return board;
+}
+
+static chessPiece[,] createBoardChess()
+{
+    chessPiece[,] board = new chessPiece[8, 8];
+
+    board = row1(true, 0, board);
+    board = row2(true, 1, board);
+
+    board = row1(false, 7, board);
+    board = row2(false, 6, board);
+
+    static chessPiece[,] row1(bool team, int row, chessPiece[,] board)
+    {
+        board[0, row] = new chessPiece(team, "H", "Castle", "castle");
+        board[7, row] = new chessPiece(team, "H", "Castle", "castle");
+
+        board[1, row] = new chessPiece(team, "R", "Knight", "knight");
+        board[6, row] = new chessPiece(team, "R", "Knight", "knight");
+
+        board[2, row] = new chessPiece(team, "I", "Bishop", "bishop");
+        board[5, row] = new chessPiece(team, "I", "Bishop", "bishop");
+
+        board[3, row] = new chessPiece(team, "Q", "Queen", "queen");
+        board[4, row] = new chessPiece(team, "K", "King", "king");
+
+        return board;
+    }
+
+    static chessPiece[,] row2(bool team, int row, chessPiece[,] board)
+    {
+        for (int x = 0; x < 8; x++)
+        {
+            board[x, row] = new chessPiece(team, "o", "pawn", "pawn");
+        }
+
+        return board;
+    }
+
+    return board;
+}
+
+static bool checkValidChess(chessPiece[,] board, int selectedPiece, int desiredMove, player player, int[] difference, bool errorMessage)
+{
+    chessPiece selected = board[selectedPiece / 10, selectedPiece % 10];
+
+    if (selected.returnType() == "pawn")
+    {
+        int multiplier = 1; //used to determine whether the pawn can move 2 squares
+        int direction = 1;
+
+        if (selected.returnMoveNum() == 0)
+        {
+            multiplier = 2;
+        }
+
+        if (selected.returnTeam() == false)
+        {
+            direction = -1;
+        }
+
+        if (board[desiredMove / 10, desiredMove % 10] == null) // Not taking a piece
+        {
+            if (difference[0] == 0)
+            {
+                if (difference[1] == 1 * direction || difference[1] == 1 * direction * multiplier)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (board[desiredMove / 10, desiredMove % 10].returnTeam() != player.returnTeam()) //Taking a piece
+        {
+            if (difference[0] == 1 || difference[0] == -1)
+            {
+                if (difference[1] == 1 * direction)
+                {
+                    return true;
+                }
+            }
+        }
+
+        if (errorMessage == true)
+        {
+            Console.WriteLine("Invalid Move");
+        }
+        return false;
+    }else
+    {
+        for (int i = 0; i < selected.returnMoves().GetLength(0); i++)
+        {
+            if (difference[0] == selected.returnMoves()[i,0] && difference[1] == selected.returnMoves()[i, 1])
+            {
+                if (board[desiredMove / 10, desiredMove % 10] == null)
+                {
+                    return true;
+                }
+
+                if (board[desiredMove / 10, desiredMove % 10].returnTeam() != player.Team)
+                {
+                    return true;
+                }
+            }
+
+            if (selected.returnMoves()[i,0] % 9 == 0 || selected.returnMoves()[i,1] % 9 == 0)
+            {
+                if (longMove(board, selected, player, selectedPiece, desiredMove, false, i) == true)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    Console.WriteLine("Invalid move");
+    return false;
+}
+
+static bool longMove(chessPiece[,] board, chessPiece selected, player player, int selectedPiece, int desiredMove, bool errorMessage, int positionInMoveQueue)
+{
+    int x = 0;
+    int y = 0;
+
+    int[] selectedList = new int[2];
+    selectedList[0] = selectedPiece / 10;
+    selectedList[1] = selectedPiece % 10;
+
+    if (selected.returnMoves()[positionInMoveQueue, 0] % 9 == 0)
+    {
+        x = selected.returnMoves()[positionInMoveQueue, 0] / 9;
+    }
+
+    if (selected.returnMoves()[positionInMoveQueue, 1] % 9 == 0)
+    {
+        y = selected.returnMoves()[positionInMoveQueue, 1] / 9;
+    }
+
+    while (true)
+    {
+        selectedList[0] += x;
+        selectedList[1] += y;
+
+        //check if out of bouns
+        if (selectedList[0] < 0 || selectedList[0] > 7)
+        {
+            if (errorMessage == true)
+            {
+                Console.WriteLine("Move Invalid (Long-Move) (Move out of bounds)");
+            }
+            return false;
+        }
+        if (selectedList[1] < 0 || selectedList[1] > 7)
+        {
+            if (errorMessage == true)
+            {
+                Console.WriteLine("Move Invalid (Long-Move) (Move out of bounds)");
+            }
+            return false;
+        }
+
+        //check if this is the move desired
+        if (desiredMove / 10 == selectedList[0] && desiredMove % 10 == selectedList[1])
+        {
+            if (board[selectedList[0], selectedList[1]] == null)
+            {
+                return true;
+            }
+
+            if (board[selectedList[0], selectedList[1]].returnTeam() != player.returnTeam())
+            {
+                return true;
+            }
+        }
+
+        //check not blocked
+        if (board[selectedList[0], selectedList[1]] != null)
+        {
+            if (errorMessage == true)
+            {
+                Console.WriteLine("Move Invalid (Long-Move)");
+            }
+            return false;
+        }
+    }
+}
+
+static chessPiece[,] upgradeQueen(chessPiece[,] board, int desiredMove, player player) //To finish =================================================================================
+{
+    return board;
+}
+
 //Generic functions ---------------------------------------------------------------------------
 
 static int convertMove(string preMove)
@@ -427,7 +721,7 @@ static bool checkValid(piece[,] board ,int selectedPiece, int desiredMove, playe
         return checkDraughtsValid(board, selectedPiece, midpoint, difference, blankMove, player, selected, errorMessage);
     }
 
-    return false;
+    return true;
 }
 
 static int[] findDifference(int selectedPiece, int desiredMove)
@@ -442,6 +736,7 @@ static int[] findDifference(int selectedPiece, int desiredMove)
 
 static void displayBoard(piece[,] board)
 {
+    Console.ForegroundColor = ConsoleColor.White;
     Console.WriteLine("| |A|B|C|D|E|F|G|H|");
     for (int y = 0; y < 8; y++)
     {
@@ -455,11 +750,15 @@ static void displayBoard(piece[,] board)
             } 
             else if (board[x, y].Team == false)
             {
-                Console.Write("x");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write("{0}", board[x, y].returnSymbol());
+                Console.ForegroundColor = ConsoleColor.White;
             }
             else if (board[x, y].Team == true)
             {
-                Console.Write("O");
+                Console.ForegroundColor = ConsoleColor.Blue;
+                Console.Write("{0}", board[x, y].returnSymbol());
+                Console.ForegroundColor = ConsoleColor.White;
             }
         }
         Console.Write("|\n");
@@ -517,9 +816,11 @@ public class piece
     public bool Team = false;
     protected bool Draughts = true;
     protected bool Upgraded = false;
-    public piece(bool team)
+    protected string Symbol = " ";
+    public piece(bool team, string symbol)
     {
         Team = team;
+        Symbol = symbol;
     }
 
     public bool isDraughts()
@@ -541,18 +842,74 @@ public class piece
     {
         return Upgraded;
     }
+
+    public string returnSymbol()
+    {
+        return Symbol;
+    }
+
+    public void changeSymbol(string NewSymbol) 
+    {
+        if (NewSymbol != null)
+        {
+            Symbol = NewSymbol;
+        }
+        else
+        {
+            Console.WriteLine("Error, null symbol change");
+        }
+    }
 }
 
 public class chessPiece : piece
 {
     protected string Name = "";
     protected string Type = "";
+    protected int[,] PossibleMoves = null;
+    protected int moveNum = 0;
 
-    public chessPiece(bool team, string name, string type) : base(team)
+    public chessPiece(bool team, string symbol, string name, string type) : base(team, symbol)
     {
         Name = name;
         Type = type;
         Draughts = false;
+
+        if (type == "king")
+        {
+            PossibleMoves = new int[8, 2]
+            {
+                {1, 1}, {1, 0}, {1, -1}, {0, 1}, {0, -1}, {-1, 1}, {-1, 0}, {-1, -1}
+            };
+        } else if (type == "queen")
+        {
+            PossibleMoves = new int[8, 2]
+            {
+                {9, 9}, {9, 0}, {9, -9}, {0, 9}, {0, -9}, {-9, 9}, {-9, 0}, {-9, -9}
+            };
+        } else if (type == "kinght")
+        {
+            PossibleMoves = new int[8, 2]
+            {
+                {2, 1}, {2, -1}, {-2, 1}, {-2, -1}, {1, 2}, {1, -2}, {-1, 2}, {-1, -2}
+            };
+        } else if (type == "bishop")
+        {
+            PossibleMoves = new int[4, 2]
+            {
+                {9, 9}, {9, -9}, {-9, 9}, {-9, -9}
+            };
+        } else if (type == "castle")
+        {
+            PossibleMoves = new int[4, 2]
+            {
+                {9, 0}, {0, 9}, {0, -9}, {-9, 0}
+            };
+        }
+    }
+
+    public int[,] returnMoves()
+    {
+        return PossibleMoves;
     }
 
     public string returnName()
@@ -564,9 +921,14 @@ public class chessPiece : piece
     {
         return Type;
     }
-}
 
-public class chessMoves
-{
-    protected int[,] KinghtMoves = new int[8, 2];
+    public void incrementMoveNum()
+    {
+        moveNum++;
+    }
+
+    public int returnMoveNum()
+    {
+        return moveNum;
+    }
 }
