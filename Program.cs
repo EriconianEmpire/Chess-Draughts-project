@@ -886,7 +886,7 @@ public class chessPiece : piece
             {
                 {9, 9}, {9, 0}, {9, -9}, {0, 9}, {0, -9}, {-9, 9}, {-9, 0}, {-9, -9}
             };
-        } else if (type == "kinght")
+        } else if (type == "kight")
         {
             PossibleMoves = new int[8, 2]
             {
